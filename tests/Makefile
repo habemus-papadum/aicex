@@ -37,7 +37,7 @@ IVERILOG_VER=master
 YOSYS_VER=main
 GTKWAVE_VER=3.3.117
 OPENROAD_VER=master
-GCC_VER=15
+GCC_VER=16
 
 #---------------------------------------------------------------------
 #- Variables
@@ -276,7 +276,7 @@ else
 	perl -pe "s/-g/-g -Wno-error=implicit-function-declaration/ig" -i magic/configure
 	cd magic && CC=${CC_GCC} CXX=${CC_GPP} ./configure CC=${CC_GCC} CXX=${CC_GPP}  --prefix=${TK_PREFIX} --with-tcl=${TK_PREFIX}/lib \
 	--with-tk=${TK_PREFIX}/lib --x-includes=${X11_INC} --x-libraries=${X11_LIB} \
-	--with-cairo=${X11_INC}/cairo  --with-opengl=${X11_LIB} CFLAGS="${CFLAGS}"&& \
+	--with-cairo=${X11_INC}/cairo  --with-opengl=${X11_LIB} CFLAGS="${CFLAGS} -std=gnu11"&& \
 	make
 endif
 endif
