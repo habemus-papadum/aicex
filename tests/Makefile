@@ -156,11 +156,15 @@ ifeq (${OS},mac)
 	brew install readline
 	brew install libomp
 	brew install automake
+#- yosys builds with CMake since v0.67, and needs >= 3.28.
+	brew install cmake
 	brew install glib
 	brew install cairo
 	brew install libxaw
 	brew install flex
 	brew install fftw
+#- Xyce only: Trilinos links SuiteSparse's AMD (see TRILINOS_CMAKE_FLAGS).
+	brew install suitesparse
 	brew install tcl-tk
 	brew install gcc@14
 	brew install gtk+
@@ -184,7 +188,8 @@ ifeq (${VER},24.04)
 	libxcb1 libx11-xcb-dev libcairo2 libcairo2-dev \
 	tcl8.6 tcl8.6-dev tk8.6 tk8.6-dev libxpm4  \
 	xterm vim-gtk3 gawk tcl-tclreadline libxpm-dev automake	libtool libxaw7-dev libreadline-dev gperf \
-	xz-utils liblzma-dev libgtk2.0-dev python3-pil.imagetk verilator patchelf
+	xz-utils liblzma-dev libgtk2.0-dev python3-pil.imagetk verilator patchelf \
+	cmake gfortran libblas-dev liblapack-dev libsuitesparse-dev libfftw3-dev
 
 else
 ifeq (${VER},26.04)
@@ -200,7 +205,8 @@ ifeq (${VER},26.04)
 	tcl-dev tk-dev tcl-tclreadline libxpm4 libxpm-dev \
 	xterm vim-gtk3 gawk autoconf automake	libtool libreadline-dev gperf \
 	zlib1g-dev libncurses-dev libqhull-dev \
-	xz-utils liblzma-dev libgtk2.0-dev python3-pil.imagetk verilator patchelf
+	xz-utils liblzma-dev libgtk2.0-dev python3-pil.imagetk verilator patchelf \
+	cmake gfortran libblas-dev liblapack-dev libsuitesparse-dev libfftw3-dev
 
 else
 	sudo apt -y install python3-pip libxft2 libxss1 \
@@ -627,6 +633,12 @@ CLANG_CMAKE_FLAGS = -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang++
 XYCE_CMAKE_FLAGS = ${CLANG_CMAKE_FLAGS} -D FLEX_INCLUDE_DIR=${BREW_DIR}/opt/flex/include
 TRILINOS_CMAKE_FLAGS = ${CLANG_CMAKE_FLAGS} -D CMAKE_Fortran_COMPILER=gfortran-${GCC_VER} \
 	-D AMD_INCLUDE_DIRS=${BREW_DIR}/include/suitesparse -D AMD_LIBRARY_DIRS=${BREW_DIR}/lib
+else
+#- Debian/Ubuntu put SuiteSparse's headers in /usr/include/suitesparse, not
+#- /usr/include, so Trilinos' TPL search finds libamd.so on the default library
+#- path but never finds amd.h, and configure aborts with
+#- "TPL_AMD_NOT_FOUND=TRUE". The library dir needs no help.
+TRILINOS_CMAKE_FLAGS = -D AMD_INCLUDE_DIRS=/usr/include/suitesparse
 endif
 
 #- Builds and installs Trilinos (Xyce's configure needs it installed), then
