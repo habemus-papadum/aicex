@@ -288,6 +288,45 @@ native Quartz app and doesn't need XQuartz.
 So it doesn't detect Quartz and builds without macOS menu-bar/dock
 integration, and menus sit inside the window. Everything else works.
 
+### 14. PDK: `install_open_pdk.sh` assumed root and `/opt/pdk`
+
+None of the Makefile targets install a PDK. The sky130A PDK comes from
+`tests/install_open_pdk.sh`, which builds it with
+[open_pdks](https://github.com/RTimothyEdwards/open_pdks) using the same
+configure line as `docker/Dockerfile_26.04`. It builds only sky130A with
+the primitives, the `hd` standard cells and xschem/klayout/precheck.
+That is far smaller than the full sky130 set with every library and
+variant. `tests/clone_open_pdk.sh` instead clones
+[wulffern/pdk](https://github.com/wulffern/pdk), a 2022 snapshot of an
+Ubuntu `/opt/pdk`, and wasn't changed.
+
+Problems with the old script:
+
+- It hardcoded `/opt/pdk`, `PDK_ROOT`, `/opt/eda/bin` and `/opt/eda/lib`.
+- It ran `sudo mkdir /opt/pdk`, `sudo chmod 777 /opt/pdk` and
+  `sudo make install` unconditionally.
+- `test -f /opt/pdk` and `test -f open_pdks` should be `-d`. On a rerun,
+  `git clone` failed on the existing directory, and the script carried on
+  with the stale checkout.
+- It cloned the source into the install prefix, `/opt/pdk/open_pdks`.
+- It had no `set -e`, so a failed configure or make still exited 0.
+- `--disable-klayout-gf180mcu` no longer exists (configure warns
+  "unrecognized options"). The newer `gf180mcu_re_efuse` package wasn't
+  disabled, so it would still be "installed automatically".
+
+**Fix:** The prefix comes from `PDK_PREFIX`, else from `PDK_ROOT` minus
+`/share/pdk`, else `/opt/pdk`. `sudo` is only used when that prefix isn't
+writable, and `SUDO=` overrides it. The script clones or updates
+`tests/open_pdks` (gitignored), puts `$EDA_PREFIX/bin` on `PATH` so
+open_pdks finds magic, and uses `set -euo pipefail`. With the `~/.zshrc`
+above, run `tests/install_open_pdk.sh` and it installs sky130A into
+`~/opt/pdk/share/pdk`.
+
+open_pdks' current top-level `configure` is a wrapper around
+`scripts/configure`. `--help` shows the sky130 switch mangled as
+`--enable-sky130-sky130`, but `--enable-sky130-pdk` still works. On macOS
+it finds Homebrew's `gsed`, installed by `make requirements`.
+
 Note: every step of `ngspice_compile` is prefixed with `-`, so make
 ignores failures and the target always "succeeds". Check the log or
 `ngspice/src/ngspice` to see whether it actually built.
