@@ -505,13 +505,16 @@ yosys:
 	git clone --recursive https://github.com/YosysHQ/yosys.git
 	cd yosys && git checkout ${YOSYS_VER}
 
+#- yosys switched from its Makefile to CMake in v0.67.
 yosys_compile: yosys
 	cd yosys && git checkout ${YOSYS_VER}
-	cd yosys && git pull && make config-gcc PREFIX=${EDA_PREFIX} \
-	&& make -j 8 PREFIX=${EDA_PREFIX}
+	cd yosys && git pull && git submodule update --init --recursive
+	cd yosys && cmake -B build . -DCMAKE_BUILD_TYPE=Release \
+	-DCMAKE_INSTALL_PREFIX=${EDA_PREFIX} && \
+	cmake --build build -j 8
 
 yosys_install:
-	cd yosys && ${SUDO} make PREFIX=${EDA_PREFIX} install
+	cd yosys && ${SUDO} cmake --install build
 
 #--------------------------------------------------------------------
 # GTKWave
