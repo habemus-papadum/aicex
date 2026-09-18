@@ -150,3 +150,21 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Sources downloaded / cloned by tests/Makefile (see "make clean")
+/tests/tcl*-src.tar.gz
+/tests/tk*-src.tar.gz
+/tests/tcl8.*/
+/tests/tk8.*/
+/tests/magic/
+/tests/xschem/
+/tests/xschem-*/
+/tests/netgen/
+/tests/ngspice/
+/tests/iverilog/
+/tests/yosys/
+/tests/gtkwave*
+/tests/OpenROAD/
+/tests/openEMS-Project/
+/tests/Trilinos/
+/tests/Xyce/
