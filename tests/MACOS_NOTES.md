@@ -331,6 +331,69 @@ Note: every step of `ngspice_compile` is prefixed with `-`, so make
 ignores failures and the target always "succeeds". Check the log or
 `ngspice/src/ngspice` to see whether it actually built.
 
+### 15. xpra: the Homebrew cask no longer installs
+
+**Symptom:** `brew install --cask xpra` refuses to install. Since
+2026-09-01 the upstream `Xpra.app` no longer passes the Gatekeeper
+check, so Homebrew won't install it.
+
+The upstream macOS build (`docs/Build/MacOS.md` in the xpra repo) uses
+jhbuild/gtk-osx and asks you to remove Homebrew or move it out of the
+way first. That isn't practical here.
+
+**Fix:** `tests/install_xpra_macos.sh` builds xpra from source with
+Homebrew's GTK3 and PyGObject. It installs a command-line xpra, not an
+`.app` bundle, so Gatekeeper never checks it. With no arguments it
+builds the latest GitHub release. It clones into `tests/xpra`, which is
+gitignored, and installs into a Python venv at `~/.local/share/xpra`.
+It then writes `xpra` and `xpra_launcher` wrappers into `~/.local/bin`,
+which must be on `PATH`. Override these with `XPRA_VER`, `XPRA_SRC`,
+`XPRA_PREFIX` and `BIN_DIR`. It doesn't use sudo. `XPRA_NOTES.md`
+covers using the client and setting up the Linux server.
+
+```sh
+tests/install_xpra_macos.sh
+xpra --version
+```
+
+What the script works around:
+
+- **The venv must use Homebrew's `python3`.** Homebrew's `pygobject3`
+  (`gi`) is built for that interpreter only. The venv is created with
+  `--system-site-packages` so it can see `gi` and `cairo`. The rest
+  (pyobjc, pillow, pyopengl, cryptography, paramiko, ...) is installed
+  with pip.
+- **`FileNotFoundError: '/usr/local/bin/cython'`.** `setup.py` runs
+  `cython --generate-shared` and looks for `cython` on `PATH`. The fix
+  is to put the venv's `bin` on `PATH` for the build.
+- **`fatal error: 'gtk-3.0/gdk/gdk.h' file not found`.** This happens in
+  `xpra/platform/darwin/gdk3_bindings`. The include is relative to the
+  Homebrew include directory, which Apple clang doesn't search by
+  default. The fix is `CFLAGS=-I$(brew --prefix)/include` (plus the
+  matching `LDFLAGS`).
+- **`jhbuild: No such file or directory`.** These messages during
+  `setup.py` are harmless. It is probing for the upstream gtk-osx build
+  environment.
+- **`No module named 'certifi'` / `failed to locate SSL ca file`.** Every
+  command printed this traceback. The fix is to install `certifi` in the
+  venv.
+- **`cannot find CSS directory '.../Python.app/Contents/Resources/css'`.**
+  xpra's macOS path code (`xpra/platform/darwin/paths.py`) assumes it is
+  running from `Xpra.app`. It asks `gtkosx_application` for the bundle's
+  resource path and finds Homebrew's `Python.app`. It expects `css/` at
+  the top of the resources directory and `share/xpra/{icons,images}` and
+  `etc/xpra` below it. The fix has two parts. First, the wrappers set
+  `XPRA_RESOURCES_DIR` to the install prefix, which already has
+  `share/` and `etc/` in that layout. Second, the script links
+  `<prefix>/css` to `share/xpra/css`.
+
+Limitations: the X11 server backends (`x11`, `gtk_x11`) and the webcam
+are disabled on macOS, so this is a client plus a macOS shadow server.
+There's no Dock or Finder app bundle. The venv is tied to Homebrew's
+Python minor version. If `brew upgrade` moves `python3` to a new minor
+version, the script stops and asks you to delete the prefix and rerun
+it.
+
 ### Notes
 
 - `LD_LIBRARY_PATH` does nothing on macOS. The dynamic loader uses

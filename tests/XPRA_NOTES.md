@@ -16,14 +16,23 @@ In the commands below, `HOST` is the Linux box and `USER` your login on it.
 The client is a native macOS app, so XQuartz isn't needed. It requires
 macOS 12 or later. Use a 6.x client to match the server.
 
-**Homebrew** (easiest; puts `xpra` on your `PATH`):
+**Homebrew cask: no longer works.** Since 2026-09-01 `Xpra.app` fails
+the Gatekeeper check, so `brew install --cask xpra` won't install it.
+
+**Build from source** (puts `xpra` on your `PATH`, needs no sudo):
 
 ```sh
-brew install --cask xpra
+tests/install_xpra_macos.sh
 xpra --version
 ```
 
-Upgrade with `brew upgrade --cask xpra`.
+This builds the latest xpra release against Homebrew's GTK3 into a venv
+at `~/.local/share/xpra`. It also adds `xpra` and `xpra_launcher`
+wrappers to `~/.local/bin`, which must be on `PATH`. Rerun it to
+upgrade. It builds a command-line client, not an app bundle, so there's
+nothing to open from Finder. `xpra_launcher` opens the same connection
+dialog that Xpra.app does. Why each step is needed is in
+`MACOS_NOTES.md`, issue 15.
 
 **PKG from xpra.org** (also registers `xpra+ssl://` links and `.xpra` session
 files with macOS; the Homebrew cask uses the DMG, which doesn't):
