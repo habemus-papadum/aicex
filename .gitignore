@@ -106,6 +106,10 @@ ipython_config.py
 
 # pyenv
 .python-version
+#- ...but uv uses the same file to pin the interpreter, and that pin has to be
+#- shared for "uv sync" to be reproducible across macOS and Linux. uv fetches
+#- the version itself, so it does not depend on a system python.
+!.python-version
 
 # pipenv
 #   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.

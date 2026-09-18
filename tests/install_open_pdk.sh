@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
-#- Build and install the sky130A PDK with open_pdks: primitives, the hd
+#- Build and install the sky130 PDK with open_pdks: primitives, the hd
 #- standard cells, and the xschem/klayout/precheck setup. Other sky130
 #- libraries and all of gf180mcu are skipped.
+#-
+#- SKY130_VARIANTS selects the variants: "all" (default) builds sky130A and
+#- sky130B, "A" or "B" builds just that one. sky130B is not optional for this
+#- repo - ip/tech_sky130B and every *_sky130nm IP (sun_*, rply_*, cnr_*) read
+#- ${PDK_ROOT}/sky130B/libs.ref and libs.tech, and the root "make test" target
+#- runs ip/rply_ex0_sky130nm. Use SKY130_VARIANTS=A for a smaller install if
+#- you only need the newer sky130a designs (jnw_*, lelo_*, rey_*).
 #-
 #- Installs into ${PDK_PREFIX}/share/pdk, i.e. PDK_ROOT=${PDK_PREFIX}/share/pdk.
 #- PDK_PREFIX defaults to ${PDK_ROOT%/share/pdk} when PDK_ROOT is set, and
@@ -45,7 +52,8 @@ else
 fi
 
 cd open_pdks
-./configure --prefix="$PDK_PREFIX" --enable-sky130-pdk --with-sky130-variants=A \
+./configure --prefix="$PDK_PREFIX" --enable-sky130-pdk \
+    --with-sky130-variants="${SKY130_VARIANTS:-all}" \
     --enable-primitive-sky130 --enable-sc-hd-sky130 \
     --disable-io-sky130 --disable-sc-hs-sky130 --disable-sc-ms-sky130 --disable-sc-ls-sky130 \
     --disable-sc-lp-sky130 --disable-sc-hdll-sky130 --disable-sc-hvl-sky130 --disable-alpha-sky130 \

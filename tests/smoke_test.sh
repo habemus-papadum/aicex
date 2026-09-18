@@ -8,6 +8,12 @@ set -uo pipefail
 
 EDA_PREFIX=${EDA_PREFIX:-/opt/eda}
 export PATH=${EDA_PREFIX}/bin:${PATH}
+#- Deliberately *not* setting LD_LIBRARY_PATH: "make eda_install" runs
+#- set_rpath.sh, which bakes an $ORIGIN-relative RPATH into everything that
+#- links ${EDA_PREFIX}/lib. Leaving it unset is what makes these checks catch a
+#- missing or stale RPATH (without it, vvp fails outright, and xschem/netgen
+#- silently fall back to the system tcl).
+unset LD_LIBRARY_PATH
 
 tmp=${TMPDIR:-/tmp}
 WORK=$(mktemp -d "${tmp%/}/smoke.XXXXXX")

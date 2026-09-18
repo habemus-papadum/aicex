@@ -68,7 +68,11 @@ CC_GPP=g++-${GCC_VER}
 else
 CC_GCC=gcc
 CC_GPP=g++
-VER=$(shell lsb_release -sr)
+#- /etc/os-release is always present; lsb_release is not (the ubuntu:24.04
+#- base image has no lsb-release package). With an empty VER, "requirements"
+#- falls through to the pre-22.04 branch and apt fails on libgl1-mesa-glx,
+#- which no longer exists on 24.04+. Keep lsb_release as a fallback.
+VER=$(shell . /etc/os-release 2>/dev/null && echo $$VERSION_ID || lsb_release -sr)
 endif
 
 
@@ -121,6 +125,15 @@ eda_install:
 	make ngspice_install
 	make iverilog_install
 	make yosys_install
+ifneq (${OS},mac)
+	make eda_rpath
+endif
+
+#- Linux only: bake ${EDA_PREFIX}/lib into the installed binaries as an
+#- $$ORIGIN-relative RPATH, so nothing needs LD_LIBRARY_PATH. The macOS
+#- equivalent is the install_name_tool steps in the *_install targets.
+eda_rpath:
+	EDA_PREFIX="${EDA_PREFIX}" ./set_rpath.sh
 
 clean:
 	-rm -rf ${tclver}*
@@ -171,7 +184,7 @@ ifeq (${VER},24.04)
 	libxcb1 libx11-xcb-dev libcairo2 libcairo2-dev \
 	tcl8.6 tcl8.6-dev tk8.6 tk8.6-dev libxpm4  \
 	xterm vim-gtk3 gawk tcl-tclreadline libxpm-dev automake	libtool libxaw7-dev libreadline-dev gperf \
-	xz-utils liblzma-dev libgtk2.0-dev python3-pil.imagetk verilator
+	xz-utils liblzma-dev libgtk2.0-dev python3-pil.imagetk verilator patchelf
 
 else
 ifeq (${VER},26.04)
@@ -187,7 +200,7 @@ ifeq (${VER},26.04)
 	tcl-dev tk-dev tcl-tclreadline libxpm4 libxpm-dev \
 	xterm vim-gtk3 gawk autoconf automake	libtool libreadline-dev gperf \
 	zlib1g-dev libncurses-dev libqhull-dev \
-	xz-utils liblzma-dev libgtk2.0-dev python3-pil.imagetk verilator
+	xz-utils liblzma-dev libgtk2.0-dev python3-pil.imagetk verilator patchelf
 
 else
 	sudo apt -y install python3-pip libxft2 libxss1 \
@@ -198,7 +211,7 @@ else
 	libxcb1 libx11-xcb-dev libcairo2 libcairo2-dev \
 	tcl8.6 tcl8.6-dev tk8.6 tk8.6-dev libxpm4  \
 	xterm vim-gtk3 gawk tcl-tclreadline libxpm-dev automake	libtool libxaw7-dev libreadline-dev gperf \
-	xz-utils liblzma-dev libgtk2.0-dev python3-pil.imagetk
+	xz-utils liblzma-dev libgtk2.0-dev python3-pil.imagetk patchelf
 
 endif
 endif
@@ -517,12 +530,23 @@ yosys:
 	git clone --recursive https://github.com/YosysHQ/yosys.git
 	cd yosys && git checkout ${YOSYS_VER}
 
+#- On Linux, pin both compilers. yosys' CMakeLists aborts with "C and C++
+#- compilers must be provided by the same vendor", and cmake defaults to
+#- cc/c++, which update-alternatives can point at different vendors (a box
+#- with c++ -> clang++ and cc -> gcc fails here). Every other compile target
+#- already passes CC=${CC_GCC} CXX=${CC_GPP}. macOS keeps cmake's default,
+#- since CC_GCC there is Homebrew's gcc-${GCC_VER}, not the clang that built
+#- the rest of the tools.
+ifneq (${OS},mac)
+YOSYS_CMAKE_FLAGS = -DCMAKE_C_COMPILER=${CC_GCC} -DCMAKE_CXX_COMPILER=${CC_GPP}
+endif
+
 #- yosys switched from its Makefile to CMake in v0.67.
 yosys_compile: yosys
 	cd yosys && git checkout ${YOSYS_VER}
 	cd yosys && git pull && git submodule update --init --recursive
 	cd yosys && cmake -B build . -DCMAKE_BUILD_TYPE=Release \
-	-DCMAKE_INSTALL_PREFIX=${EDA_PREFIX} && \
+	-DCMAKE_INSTALL_PREFIX=${EDA_PREFIX} ${YOSYS_CMAKE_FLAGS} && \
 	cmake --build build -j 8
 
 yosys_install:
@@ -554,7 +578,13 @@ ifeq (${OS},mac)
 	cd gtkwave && ./configure --prefix ${EDA_PREFIX} --disable-tcl --disable-xy --enable-gtk3 \
 	CPPFLAGS="-I${BREW_DIR}/include" LDFLAGS="-L${BREW_DIR}/lib" && make
 else
-	cd gtkwave && ./configure --prefix ${EDA_PREFIX} --disable-tcl --disable-xy && make
+	#- --disable-mime-update: the install-data-hook runs "update-desktop-database"
+	#- with no arguments, which rewrites the system-wide XDG databases. Installing
+	#- into a prefix we own (no sudo) then fails with "The databases in
+	#- [/usr/share/applications, ...] could not be updated". The binaries are
+	#- installed before the hook runs, so the failure is easy to miss.
+	cd gtkwave && ./configure --prefix ${EDA_PREFIX} --disable-tcl --disable-xy \
+	--disable-mime-update && make
 endif
 
 gtkwave_install:

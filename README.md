@@ -36,13 +36,24 @@ For a description of the usage, see
 
 # For the impatient
 
+The python tooling is managed with [uv](https://docs.astral.sh/uv/). `uv sync`
+reads `pyproject.toml`/`uv.lock` and builds `.venv` with the pinned versions of
+cicconf, cicsim, cicspi and cicpy. It also fetches the interpreter named in
+`.python-version`, so no system python is involved — which matters on Ubuntu
+24.04 and later, where `pip install --user` is refused outright (PEP 668).
+
 ``` sh
 git clone --recursive https://github.com/wulffern/aicex.git
-python3 -m pip install cicconf
-cd aicex/ip
-cicconf clone --https
+cd aicex
+uv sync
+cd ip
+uv run cicconf clone --https
 cd ..
 ```
+
+`uv run <tool>` works without activating anything; `source .venv/bin/activate`
+also works if you prefer. Add `--extra wave` to `uv sync` for `cicwave`, the Qt
+waveform viewer — it is opt-in because PySide6 alone is ~650 MB.
 
 I assume you have docker installed, or have windows subsystem for linux. 
 

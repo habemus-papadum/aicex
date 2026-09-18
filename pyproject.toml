@@ -1,0 +1,38 @@
+#- Python tooling for the aicex flow, managed with uv.
+#-
+#-   uv sync          create .venv and install the locked versions
+#-   uv run cicconf   run a tool without activating anything
+#-   uv lock          re-resolve after editing dependencies
+#-
+#- This project is not itself a package (no build-system table), it exists only
+#- to pin the tools. The EDA toolchain in tests/Makefile needs none of this:
+#- magic, xschem, netgen, ngspice, iverilog, yosys and open_pdks all use the
+#- system python3.
+[project]
+name = "aicex"
+version = "0.1.0"
+description = "Analog Integrated Circuit EXamples - python tooling"
+readme = "README.md"
+#- 3.10 is the floor that still covers Ubuntu 22.04's python3.
+requires-python = ">=3.10"
+
+dependencies = [
+    #- Clones and tracks the IP repositories listed in ip/config.yaml
+    #- ("cicconf clone"). This is the bootstrap tool.
+    "cicconf",
+    #- Simulation orchestration and SPICE parsing.
+    "cicsim",
+    "cicspi",
+    #- Transpiler and layout support (ciccreator JSON -> magic/xschem).
+    "cicpy",
+]
+
+[project.optional-dependencies]
+#- cicwave is a Qt waveform viewer, so it drags in PySide6: 649 MB of the
+#- 885 MB a full install costs, for one GUI tool. Keep it opt-in:
+#-   uv sync --extra wave
+wave = ["cicwave"]
+
+[tool.uv]
+#- Nothing here is importable as "aicex"; don't try to build it.
+package = false
