@@ -37,6 +37,9 @@ IVERILOG_VER=master
 YOSYS_VER=main
 GTKWAVE_VER=3.3.117
 OPENROAD_VER=master
+XYCE_VER=Release-7.10.0
+#- Xyce 7.10 is only tested against Trilinos 14.4 (see xyce/INSTALL.md)
+TRILINOS_VER=trilinos-release-14-4-0
 GCC_VER=16
 
 #---------------------------------------------------------------------
@@ -566,10 +569,29 @@ openroad_install:
 # XYCE
 #--------------------------------------------------------------------
 trilinos:
-	git clone git@github.com:trilinos/Trilinos.git
+	git clone --depth 1 --branch ${TRILINOS_VER} https://github.com/trilinos/Trilinos.git trilinos
 
 xyce:
-	git clone git@github.com:Xyce/Xyce.git
+	git clone --depth 1 --branch ${XYCE_VER} https://github.com/Xyce/Xyce.git xyce
 
+ifeq (${OS},mac)
+#- Apple clang for C/C++, Homebrew gfortran for Trilinos' Fortran code
+#- (Xyce's INSTALL.md reports AztecOO failures with clang and no Fortran),
+#- and SuiteSparse's AMD from Homebrew. BLAS/LAPACK come from Accelerate.
+CLANG_CMAKE_FLAGS = -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang++
+#- Homebrew's flex is keg-only: PATH finds the binary, not FlexLexer.h.
+XYCE_CMAKE_FLAGS = ${CLANG_CMAKE_FLAGS} -D FLEX_INCLUDE_DIR=${BREW_DIR}/opt/flex/include
+TRILINOS_CMAKE_FLAGS = ${CLANG_CMAKE_FLAGS} -D CMAKE_Fortran_COMPILER=gfortran-${GCC_VER} \
+	-D AMD_INCLUDE_DIRS=${BREW_DIR}/include/suitesparse -D AMD_LIBRARY_DIRS=${BREW_DIR}/lib
+endif
+
+#- Builds and installs Trilinos (Xyce's configure needs it installed), then
+#- builds Xyce. Xyce installs into ${EDA_PREFIX}/xyce, linked into bin/.
 xyce_compile: trilinos xyce
+	EDA_PREFIX="${EDA_PREFIX}" SUDO="${SUDO}" \
+	TRILINOS_CMAKE_FLAGS="${TRILINOS_CMAKE_FLAGS}" XYCE_CMAKE_FLAGS="${XYCE_CMAKE_FLAGS}" \
 	./compile_xyce.sh
+
+xyce_install:
+	${SUDO} cmake --install xyce-build
+	${SUDO} ln -sf ../xyce/bin/Xyce ${EDA_PREFIX}/bin/Xyce

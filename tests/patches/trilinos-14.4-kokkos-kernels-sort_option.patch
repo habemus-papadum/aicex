@@ -1,0 +1,21 @@
+Trilinos 14.4 (kokkos-kernels): drop SPADDHandle::set/get_sort_option.
+
+They use a member 'sort_option' that the class never declares. Nothing
+calls them, but Apple clang 21 diagnoses the bad member access when the
+template is defined: "error: no member named 'sort_option' in 'SPADDHandle<...>'".
+Upstream kokkos-kernels has since deleted both methods.
+
+diff --git a/packages/kokkos-kernels/sparse/src/KokkosSparse_spadd_handle.hpp b/packages/kokkos-kernels/sparse/src/KokkosSparse_spadd_handle.hpp
+index 2902550d..c129d11e 100644
+--- a/packages/kokkos-kernels/sparse/src/KokkosSparse_spadd_handle.hpp
++++ b/packages/kokkos-kernels/sparse/src/KokkosSparse_spadd_handle.hpp
+@@ -72,9 +72,7 @@ class SPADDHandle {
+    */
+   size_type get_c_nnz() { return this->result_nnz_size; }
+ 
+-  void set_sort_option(int option) { this->sort_option = option; }
+ 
+-  int get_sort_option() { return this->sort_option; }
+ 
+   /**
+    * \brief Default constructor.

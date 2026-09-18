@@ -166,5 +166,7 @@ dmypy.json
 /tests/gtkwave*
 /tests/OpenROAD/
 /tests/openEMS-Project/
-/tests/Trilinos/
-/tests/Xyce/
+/tests/trilinos/
+/tests/trilinos-build/
+/tests/xyce/
+/tests/xyce-build/

@@ -1,0 +1,22 @@
+Xyce 7.10: call std::abs(val), not std::abs<double>(val).
+
+std::abs for floating point is not a template, so the explicit template
+argument only resolved against libc++'s templated integer overloads.
+Apple clang 21 / current libc++: "error: call to 'abs' is ambiguous".
+Upstream Xyce master makes the same change.
+
+diff --git a/src/LinearAlgebraServicesPKG/N_LAS_BlockSystemHelpers.C b/src/LinearAlgebraServicesPKG/N_LAS_BlockSystemHelpers.C
+index af5d2a1..f5f57ea 100644
+--- a/src/LinearAlgebraServicesPKG/N_LAS_BlockSystemHelpers.C
++++ b/src/LinearAlgebraServicesPKG/N_LAS_BlockSystemHelpers.C
+@@ -815,8 +815,8 @@ void computePermutedDFT2(N_UTL_DFTInterfaceDecl<std::vector<double> > & dft,
+       Vector& timeVecRef = xt.block(i);
+       double val = timeVecRef[j];
+       (*inputSignal)[i] = val;
+-      if (std::abs<double>(val) > norm1)
+-        norm1 = std::abs<double>(val);
++      if (std::abs(val) > norm1)
++        norm1 = std::abs(val);
+     }
+ 
+     // Calculate the DFT for the inputSignal.
