@@ -278,6 +278,55 @@ ssh legion xpra list                   # what's running
 Closing the last window doesn't end a session; it keeps running, empty,
 until stopped.
 
+## Setting up another machine
+
+Everything above, as a checklist. Each file's contents are in this
+playbook, in the section named.
+
+### A new Linux server (instead of legion)
+
+1. System install, once per machine: `XPRA_NOTES.md`, "Server setup"
+   (xpra from xpra.org and its two 6.5.3 fixes for the port-14500 proxy,
+   then VirtualGL and NVENC if the box has an NVIDIA GPU).
+2. Packages the helpers and tests use: `sudo apt install x11-utils xclip`
+   (`xdpyinfo` is how `xp` waits for the session; `xclip` is for the
+   clipboard checks in step 4).
+3. `~/.Xresources` and its `~/.Xdefaults-$(hostname)` symlink: step 0.
+   The symlink is named after the host, so make it on the new box rather
+   than copying it.
+4. `~/.xpra-shell.sh`: "Shortcuts", "On the server".
+5. Load it from `~/.bashrc`:
+   ```sh
+   printf '\n# xpra helpers: xp, xphere\n[ -f ~/.xpra-shell.sh ] && . ~/.xpra-shell.sh\n' >> ~/.bashrc
+   ```
+6. EDA tools and PDK, if the box needs them: `INSTALL.md`.
+
+Check it from the server itself: `xp xdpyinfo | head -1` should print
+`name of display: :100`.
+
+### A new Mac client
+
+1. `tests/install_xpra_macos.sh`, with `~/.local/bin` on `PATH`.
+2. `~/.xpra/xpra.conf`:
+   ```
+   # xpra client defaults (see aicex tests/XPRA_PLAYBOOK.md).
+   # encoding: leave at auto. xpra 6.5.3's client rejects encoding=png at
+   # startup (it checks before loading its decoders), and auto already picks
+   # lossless for static text and video (NVENC on the server) for motion.
+   # Audio needs GStreamer on the Mac, which isn't installed; turning it off
+   # avoids the "No Audio" warnings.
+   speaker=off
+   audio=no
+   ```
+3. The shortcuts block in `~/.zshrc`: "Shortcuts", "On the Mac".
+4. An `~/.ssh/config` entry for the server whose `HostName` resolves from
+   this Mac (step 0), and key login working: `ssh legion true`.
+
+To point the Mac at a different server, change the three variables at the
+top of the shortcuts block: `XPRA_HOST` (the ssh host), `XPRA_TLS`
+(`user@host:14500`) and, if you want another session, `XPRA_DISPLAY`.
+Check with `xpls`, then `xpssh`.
+
 ## Troubleshooting
 
 **Connects, but no window appears.** The display already has a session,
