@@ -38,6 +38,9 @@ installed tools:
 | iverilog | master                   | compiles and simulates a `$display` testbench   |
 | yosys    | 0.69+75 (CMake build)    | synthesizes a 2-input AND to one `$_AND_` cell  |
 | ngspice  | 47 (XSPICE, CIDER, OpenMP) | `.op` of a 1k/2k divider on 1.8 V gives 1.2 V |
+| Xyce     | 7.10.0 (Trilinos 14.4, FFTW) | divider gives 1.2 V; RC step matches 1−e^(−t/RC) |
+
+Xyce is built separately with `make xyce_compile xyce_install`.
 
 ## Issues
 
@@ -192,6 +195,61 @@ anachronism").
 `AM_INIT_AUTOMAKE` in `ngspice/configure.ac`. It runs
 `git checkout -- configure.ac` before `git pull`, so the local edit
 never blocks an update.
+
+### 10. Xyce: the old `xyce_compile` target and `compile_xyce.sh`
+
+The old target never worked as written:
+
+- It cloned over SSH (`git@github.com:...`), which fails without a
+  GitHub SSH key.
+- It cloned into `Trilinos/` and `Xyce/` but built `../trilinos` and
+  `../xyce`, which only works on case-insensitive filesystems.
+- It did full-history clones. Trilinos alone is over 1 GB even shallow.
+- It used `cmake/trilinos/trilinos-config.cmake`, which Xyce has since
+  renamed to `trilinos-base.cmake`.
+- It hardcoded `/opt/eda` and didn't use sudo.
+
+**Fix:** Shallow HTTPS clones pinned to `XYCE_VER=Release-7.10.0` and
+`TRILINOS_VER=trilinos-release-14-4-0`. Xyce's INSTALL.md says only
+Trilinos 14.4 is rigorously tested. `compile_xyce.sh` builds and installs
+Trilinos to `$EDA_PREFIX/trilinos`, then builds Xyce. `make xyce_install`
+installs Xyce to `$EDA_PREFIX/xyce` and symlinks `$EDA_PREFIX/bin/Xyce`.
+On macOS the Makefile passes:
+
+- Apple clang for C/C++.
+- `gfortran-${GCC_VER}` for Trilinos' Fortran. Xyce's docs report
+  AztecOO failures with clang and no Fortran compiler.
+- SuiteSparse's AMD from Homebrew (`include/suitesparse`).
+- `FLEX_INCLUDE_DIR`. Homebrew's flex is keg-only, so `PATH` finds the
+  binary but not `FlexLexer.h`. Without it Xyce's configure fails with
+  `FLEX_INCLUDE_DIR-NOTFOUND`.
+
+BLAS/LAPACK come from Apple's Accelerate.
+
+### 11. Trilinos 14.4: `no member named 'sort_option' in 'SPADDHandle<...>'`
+
+**Cause:** kokkos-kernels' `SPADDHandle::set_sort_option()` and
+`get_sort_option()` use a member the class never declares. Nothing calls
+them. Older compilers skipped uninstantiated template members, but Apple
+clang 21 checks them. Trilinos 16 still has this bug. Upstream
+kokkos-kernels has since deleted the methods.
+
+**Fix:** `patches/trilinos-14.4-kokkos-kernels-sort_option.patch`
+deletes them. `compile_xyce.sh` applies `patches/<repo>-*.patch` to
+`./<repo>` and skips patches that are already applied.
+
+### 12. Xyce 7.10: `call to 'abs' is ambiguous`
+
+**Cause:** `N_LAS_BlockSystemHelpers.C` calls `std::abs<double>(val)`.
+The floating-point `std::abs` is not a template, so the explicit template
+argument only matched libc++'s templated integer overloads, and current
+libc++ rejects the call as ambiguous.
+
+**Fix:** `patches/xyce-7.10-std-abs.patch` changes it to
+`std::abs(val)`, the same as upstream Xyce master.
+
+Xyce doesn't understand ngspice `.control` blocks. Test it with a native
+netlist (`.DC`/`.TRAN` plus `.PRINT`). Results go to `<netlist>.prn`.
 
 Note: every step of `ngspice_compile` is prefixed with `-`, so make
 ignores failures and the target always "succeeds". Check the log or
