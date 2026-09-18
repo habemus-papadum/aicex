@@ -209,7 +209,11 @@ ${tclver}:
 	tar zxvf ${tclver}-src.tar.gz
 
 
+#- tcl/tk compile from a distclean tree: a rebuild after changing the prefix
+#- otherwise keeps objects with the old install paths compiled in (e.g.
+#- tclPkgConfig.o), and tcl then looks for init.tcl under the old prefix.
 tcl_compile: ${tclver}
+	cd ${tclver}/unix && if [ -f Makefile ]; then make distclean; fi
 	cd ${tclver}/unix && \
 	./configure --prefix=${TK_PREFIX} CFLAGS="${CFLAGS}" && \
 	make
@@ -223,6 +227,7 @@ ${tkver}:
 
 
 tk_compile: ${tkver}
+	cd ${tkver}/unix && if [ -f Makefile ]; then make distclean; fi
 	cd ${tkver}/unix && \
 	./configure --prefix=${TK_PREFIX} \
 	--with-tcl=${TK_PREFIX}/lib \
