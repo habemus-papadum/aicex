@@ -27,8 +27,8 @@ make eda_install
 ## Verified (2026-09-18)
 
 `make tt`, `make eda_compile` and `make eda_install` all run clean with
-`EDA_PREFIX=$HOME/opt/eda` and never use sudo. Smoke tests of the
-installed tools:
+`EDA_PREFIX=$HOME/opt/eda` and never use sudo. `tests/smoke_test.sh`
+reruns these checks (see `SMOKE_TESTS.md`, which also covers the GUIs):
 
 | Tool     | Version                  | Check                                           |
 |----------|--------------------------|-------------------------------------------------|
