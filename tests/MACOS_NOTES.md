@@ -39,8 +39,10 @@ installed tools:
 | yosys    | 0.69+75 (CMake build)    | synthesizes a 2-input AND to one `$_AND_` cell  |
 | ngspice  | 47 (XSPICE, CIDER, OpenMP) | `.op` of a 1k/2k divider on 1.8 V gives 1.2 V |
 | Xyce     | 7.10.0 (Trilinos 14.4, FFTW) | divider gives 1.2 V; RC step matches 1−e^(−t/RC) |
+| GTKWave  | 3.3.117 (GTK3, Quartz)   | `--version`; VCD→FST→VCD round-trip of an iverilog dump |
 
-Xyce is built separately with `make xyce_compile xyce_install`.
+Xyce and GTKWave are built separately with `make xyce_compile xyce_install`
+and `make gtkwave_compile gtkwave_install`.
 
 ## Issues
 
@@ -250,6 +252,41 @@ libc++ rejects the call as ambiguous.
 
 Xyce doesn't understand ngspice `.control` blocks. Test it with a native
 netlist (`.DC`/`.TRAN` plus `.PRINT`). Results go to `<netlist>.prn`.
+
+### 13. GTKWave: no Homebrew package; GTK2 build loads two GTKs
+
+**Homebrew:** the `gtkwave` cask is disabled ("discontinued upstream",
+2025-10-29), and there is no formula. Build it with
+`make gtkwave_compile gtkwave_install`. It isn't part of `eda_compile`.
+
+**Download:** the old `http://gtkwave.sourceforge.net/...` URL now goes
+through `https://downloads.sourceforge.net/project/gtkwave/<pkg>/<pkg>.tar.gz`.
+
+**configure: `LZMA support for VZT is enabled, but xz could not be found`:**
+Apple clang doesn't search `/opt/homebrew/include`, so `lzma.h` wasn't
+found even though `liblzma` was. The Makefile now passes
+`CPPFLAGS=-I${BREW_DIR}/include LDFLAGS=-L${BREW_DIR}/lib`. It also drops
+the old Intel-only `PKG_CONFIG_PATH=/usr/local/lib/pkgconfig`.
+
+**GTK2 and GTK3 in one process:** the GTK2 build ran, but it printed
+`objc: Class GdkQuartzView is implemented in both .../libgdk-3.0.dylib and
+.../libgdk-quartz-2.0.0.dylib ... mysterious crashes`. Homebrew's
+`gtk-mac-integration` is GTK3-only, and configure linked it into the GTK2
+binary. **Fix:** on macOS, build the GTK3 edition
+(`gtkwave-gtk3-${GTKWAVE_VER}`, `--enable-gtk3`). Linux keeps GTK2.
+
+**GTK3 without X11: `call to undeclared function 'gtk_plug_new'`:**
+Homebrew's GTK3 has only the Quartz backend (`GDK_WINDOWING_QUARTZ`), and
+`GtkPlug`/`GtkSocket` are X11-only. `patches/gtkwave-gtk3-3.3.117-no-x11.patch`
+enables `--xid` only with X11 (upstream master guards it the same way). It
+also builds `twinwave`, the side-by-side viewer built on `GtkSocket`, as a
+stub that says it isn't supported. As a result, GTKWave on macOS is a
+native Quartz app and doesn't need XQuartz.
+
+**Known gap:** GTKWave's configure checks
+`pkg-config --variable=target gdk-3.0`, but GTK 3.24 calls it `targets`.
+So it doesn't detect Quartz and builds without macOS menu-bar/dock
+integration, and menus sit inside the window. Everything else works.
 
 Note: every step of `ngspice_compile` is prefixed with `-`, so make
 ignores failures and the target always "succeeds". Check the log or
