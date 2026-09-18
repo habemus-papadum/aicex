@@ -369,13 +369,22 @@ endif
 # ngspice
 #--------------------------------------------------------------------
 
+#- Shallow clone: a full clone from SourceForge often dies with
+#- "RPC failed; curl 56 Recv failure: Connection reset by peer".
 ngspice:
-	git clone https://git.code.sf.net/p/ngspice/ngspice ngspice
-	cd ngspice && git checkout ${NGSPICE_VER} && git pull
+	git clone --depth 1 --branch ${NGSPICE_VER} https://git.code.sf.net/p/ngspice/ngspice ngspice
 
+#- ngspice's configure.ac sets no AC_CONFIG_AUX_DIR, so (g)libtoolize uses
+#- the first of . .. ../.. holding install-sh or install.sh. autogen.sh
+#- deletes ngspice/install-sh, so libtoolize found tests/install.sh, put
+#- ltmain.sh in tests/, and automake failed with "required file
+#- './ltmain.sh' not found". Pin the aux dir to ngspice/ itself; configure.ac
+#- is restored before pulling so the local edit never blocks an update.
 # Need to use gcc-11 or higher from homebrew to get openmp to work
 ngspice_compile: ngspice
-	cd ngspice && git checkout ${NGSPICE_VER} && git pull
+	cd ngspice && git checkout -- configure.ac && git checkout ${NGSPICE_VER} && git pull
+	grep -q '^AC_CONFIG_AUX_DIR' ngspice/configure.ac || \
+	perl -pi -e 'print "AC_CONFIG_AUX_DIR([.])\n" if /^AM_INIT_AUTOMAKE/' ngspice/configure.ac
 ifeq (${OS},mac)
 	-cd ngspice && glibtoolize && ./autogen.sh && ./configure \
 	--prefix ${EDA_PREFIX}/ \
