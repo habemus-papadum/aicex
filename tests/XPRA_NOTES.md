@@ -11,6 +11,9 @@ below change the NVIDIA driver.
 
 In the commands below, `HOST` is the Linux box and `USER` your login on it.
 
+For step-by-step tests of a working setup (EDA tools, OpenGL frame rate,
+copy and paste), see `XPRA_PLAYBOOK.md`.
+
 ## Installing the client on a Mac
 
 The client is a native macOS app, so XQuartz isn't needed. It requires
@@ -78,13 +81,14 @@ interfaces and logs you in with your normal Linux password. Only enable it on
 a network you trust. Use `ssl://`: plain `tcp://` from another machine is
 refused, because the client won't send a password unencrypted. The
 certificate the package generates is self-signed for "localhost", so skip
-verification:
+verification. `V` is an array, because zsh (the macOS default shell) doesn't
+split a plain `$V` string into words:
 
 ```sh
-V="--ssl-server-verify-mode=none --ssl-check-hostname=no"
-xpra attach ssl://USER@HOST:14500/     $V   # attach to your only session
-xpra attach ssl://USER@HOST:14500/100  $V   # pick one if you have several
-xpra start  ssl://USER@HOST:14500/ --start=xterm $V   # proxy starts a new session
+V=(--ssl-server-verify-mode=none --ssl-check-hostname=no)
+xpra attach ssl://USER@HOST:14500/     "${V[@]}"   # attach to your only session
+xpra attach ssl://USER@HOST:14500/100  "${V[@]}"   # pick one if you have several
+xpra start  ssl://USER@HOST:14500/ --start=xterm "${V[@]}"   # proxy starts a new session
 ```
 
 Browser, no client install: open `https://HOST:14500/`, accept the
@@ -185,9 +189,11 @@ it if xpra moves to a new Python. Remove it with
       `magic -d XR` (Cairo, no OpenGL) vs `magic -d OGL` (llvmpipe) vs
       `vglrun -d egl magic -d OGL` (GPU).
 - [ ] KLayout's 2.5D view (OpenGL) with and without `vglrun -d egl`.
-- [ ] Encodings from the client: default (auto) vs `--encoding=png`
-      (pixel-exact, good for layouts/text) vs `--encoding=h264|hevc|av1`
-      (forces video, so NVENC).
+- [ ] Encodings from the client: default (auto) vs `--encoding=rgb`
+      (pixel-exact, good for layouts/text) vs `--encoding=stream`
+      (forces video, so NVENC). The 6.5.3 macOS client rejects `png`,
+      `h264` and the other specific encodings at startup; see
+      `XPRA_PLAYBOOK.md`, step 0.
 - [ ] On a slow link: `--quality=50` / `--min-quality=30`; on a fast LAN:
       `--quality=100`.
 - [ ] Client-side `--opengl=yes` on the Mac for smoother window painting.
