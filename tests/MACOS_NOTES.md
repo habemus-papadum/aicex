@@ -394,6 +394,35 @@ Python minor version. If `brew upgrade` moves `python3` to a new minor
 version, the script stops and asks you to delete the prefix and rerun
 it.
 
+### 16. yosys: `/bin/sh: cmake: command not found`
+
+**Symptom:** `make eda_compile` dies at yosys with exit 127:
+
+```
+cd yosys && cmake -B build . -DCMAKE_BUILD_TYPE=Release ...
+/bin/sh: cmake: command not found
+make[1]: *** [yosys_compile] Error 127
+```
+
+**Cause:** issue 7 moved `yosys_compile` to CMake, but `requirements`
+never installed cmake. Nothing else in `eda_compile` needs it, so a
+machine with no cmake gets all the way to yosys before failing. Because
+yosys runs before ngspice in `eda_compile`, ngspice is skipped too.
+
+**Fix:** `requirements` now runs `brew install cmake`. yosys wants
+CMake >= 3.28. On Ubuntu, cmake is already in the apt lists.
+
+### 17. Xyce: `AMD_INCLUDE_DIRS` points at a missing suitesparse
+
+**Symptom:** `make xyce_compile` fails configuring Trilinos; the AMD
+include directory named in `TRILINOS_CMAKE_FLAGS`
+(`${BREW_DIR}/include/suitesparse`) doesn't exist.
+
+**Cause:** `requirements` didn't install suitesparse. Xyce is not part
+of `eda_compile`, so this only shows up when you build it explicitly.
+
+**Fix:** `requirements` now runs `brew install suitesparse`.
+
 ### Notes
 
 - `LD_LIBRARY_PATH` does nothing on macOS. The dynamic loader uses

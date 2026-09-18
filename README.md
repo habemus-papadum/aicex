@@ -30,6 +30,10 @@ tests/    # Makefile used for installation of the tools
 For a detailed scription of installing the tools, see
 <http://analogicus.com/aic2026/the_tools>
 
+To build the tools and the PDK from source on your own machine, see
+[tests/INSTALL.md](tests/INSTALL.md). It covers the whole flow — uv, the
+IPs, the EDA tools, the PDK — and has a macOS section at the end.
+
 For a description of the usage, see
 <https://analogicus.com/aic2026/sky130nm_tutorial>
 

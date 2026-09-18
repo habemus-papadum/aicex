@@ -46,8 +46,9 @@ make gtkwave_compile gtkwave_install
 run clean with `EDA_PREFIX=/opt/eda` and never use sudo, after the fixes
 below. `tests/smoke_test.sh` reruns these checks.
 
-`./smoke_test.sh` reports **7 passed, 0 failed, 1 skipped** (Xyce, which is
-not part of `eda_compile`).
+`./smoke_test.sh` reports **8 passed, 0 failed, 0 skipped** once Xyce is
+built as well (`make xyce_compile xyce_install`; it is not part of
+`eda_compile`). Without it, 7 passed and Xyce skipped.
 
 | Tool     | Version                      | Check                                           |
 |----------|------------------------------|-------------------------------------------------|
@@ -58,6 +59,7 @@ not part of `eda_compile`).
 | yosys    | 0.69+75 (CMake, g++ 13.3.0)  | synthesizes a 2-input AND to one `$_AND_` cell  |
 | ngspice  | 47 (XSPICE, CIDER, OpenMP)   | `.op` of a 1k/2k divider on 1.8 V gives 1.2 V   |
 | GTKWave  | 3.3.117 (GTK2)               | `--version`; VCD→FST→VCD round-trip             |
+| Xyce     | 7.10.0 (Trilinos 14.4, serial) | `.DC` of the divider gives 1.2 V              |
 | sky130   | open_pdks A+B (495 MB)       | `magic -rcfile .../sky130{A,B}.magicrc` loads each |
 
 `xschem` links `/opt/eda/lib/libtcl8.6.so` and `libtk8.6.so`, not the system
@@ -86,8 +88,9 @@ measurements from a `.control` block, so it legitimately has no `.print`
 lines. The transient itself ran (2003 rows) and the measurements were written
 to both YAML and CSV.
 
-`make requirements` on the 24.04 branch was sufficient as written — every
-header and tool the builds needed was already in the list. `libtool` there
+`make requirements` on the 24.04 branch was sufficient as written for
+`eda_compile` — every header and tool those builds needed was already in
+the list. It was *not* sufficient for Xyce; see issues 8 and 9. `libtool` there
 provides `libtoolize`, which is what `ngspice_compile` calls; the `libtool`
 wrapper script itself lives in `libtool-bin` and is not needed.
 
@@ -289,6 +292,44 @@ Both variants together cost far less than twice one: 495 MB for A+B versus
 `git pull` runs on a detached HEAD and fails. The step is prefixed with `-`,
 so make ignores it and prints `Error 1 (ignored)`. Harmless, and the same on
 macOS.
+
+### 8. Xyce: Trilinos aborts with `TPL_AMD_NOT_FOUND=TRUE`
+
+**Symptom:** `make xyce_compile` fails in the Trilinos configure step:
+
+```
+-- Searching for headers in AMD_INCLUDE_DIRS=''
+-- ERROR: Could not find a header file in the set "amd.h"
+-- ERROR: Failed finding all of the parts of TPL 'AMD' (see above), Aborting!
+CMake Error at cmake/tribits/core/package_arch/TribitsProcessEnabledTpls.cmake:278 (message):
+  ERROR: TPL_AMD_NOT_FOUND=TRUE, aborting!
+```
+
+**Cause:** Debian and Ubuntu put SuiteSparse's headers in
+`/usr/include/suitesparse`, not `/usr/include`. Trilinos' TPL search finds
+`libamd.so` on the default library path without help, but never finds
+`amd.h`. `TRILINOS_CMAKE_FLAGS` set `AMD_INCLUDE_DIRS` on macOS only, so
+the Linux configure ran with it empty.
+
+**Fix:** the `else` branch now sets
+`TRILINOS_CMAKE_FLAGS = -D AMD_INCLUDE_DIRS=/usr/include/suitesparse`.
+The library directory still needs no help.
+
+### 9. Xyce: the apt lists were missing its build dependencies
+
+**Cause:** Xyce isn't part of `eda_compile`, so `requirements` never
+installed what it needs: `gfortran` (Trilinos' Fortran code — Xyce's
+INSTALL.md reports AztecOO failures without it), BLAS/LAPACK,
+SuiteSparse, FFTW, and `cmake`.
+
+**Fix:** the 24.04 and 26.04 apt lists now include `cmake gfortran
+libblas-dev liblapack-dev libsuitesparse-dev libfftw3-dev`. On a box
+that already ran the old `requirements`:
+
+```sh
+sudo apt -y install cmake gfortran libblas-dev liblapack-dev \
+                    libsuitesparse-dev libfftw3-dev
+```
 
 ### Notes
 
