@@ -43,15 +43,30 @@ tool isn't installed, for example Xyce and GTKWave, which aren't part of
 | `./smoke_test.sh gui xschem`   | xschem's bundled `cmos_inv.sch` example schematic               |
 | `./smoke_test.sh gui netgen`   | the netgen Tk console                                           |
 | `./smoke_test.sh gui ngspice`  | an X11 plot of an RC step (`v(in)`, `v(out)`). Type `quit` at the `ngspice` prompt to exit |
-| `./smoke_test.sh gui gtkwave`  | a 100 ns simulation with the `t.clk` clock already in the Waves pane |
+| `./smoke_test.sh gui gtkwave`  | `t.clk` toggling every 5 ns across 0–100 ns, already in the Waves pane |
 
 **GTKWave** doesn't show any signals when it opens a dump file on its own.
 You pick them in the SST/Signals panes at the left: select `clk`, then
-click **Append** or double-click it. The GUI check passes a save file
-(`t.gtkw`, containing `@28` and `t.clk`) so the clock shows up right
-away. `@28` sets the display flags to binary, right-justified. The
-testbench sets `` `timescale 1ns/1ps ``. Without it iverilog defaults to
-1 s units, and the time axis reads "10 sec, 20 sec, ...".
+click **Append** or double-click it. The GUI check sets up two files so
+the clock appears right away:
+
+- `t.gtkw`, a save file containing `@28` and `t.clk`, which adds the
+  signal. `@28` is hex flags for binary, right-justified.
+- `t.gtkwaverc`, containing `do_initial_zoom_fit 1`, passed with `-r`.
+  GTKWave only zooms to fit on its own when the dump spans ≤ 400 time
+  units (`main.c`). With `` `timescale 1ns/1ps ``, 100 ns is 100 000
+  units, so without this setting it opens at full zoom-in. The Waves pane
+  then shows 0–3 ps and `clk` looks like a flat line.
+
+For your own dumps, put `do_initial_zoom_fit 1` in `~/.gtkwaverc`, or
+use **Time → Zoom → Zoom Full** (Ctrl+0) after opening.
+
+Terminal messages like `GTKWAVE | MESSAGE: gdk_atom_intern: assertion
+'atom_name != NULL' failed` come from GTK3's Quartz drag-and-drop layer,
+not from GTKWave. GTKWave's drag targets are ordinary names
+(`text/plain`, `text/uri-list`, `STRING`). They are noise and don't stop
+signals from being added. If dragging from the Signals list is
+unreliable, use **Append**/**Insert** or a double-click instead.
 
 ### X11 and `DISPLAY` on macOS
 

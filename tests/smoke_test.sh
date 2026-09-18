@@ -33,6 +33,9 @@ EOF
 @28
 t.clk
 EOF
+    #- GTKWave only zooms to fit on its own when the dump spans <= 400 time
+    #- units; 100 ns at 1 ps resolution is 100000, so ask for it explicitly.
+    echo 'do_initial_zoom_fit 1' > t.gtkwaverc
 }
 
 write_inputs() {
@@ -94,7 +97,7 @@ gui() {
         ngspice) need_x11 ngspice
                  echo "Type 'quit' at the ngspice prompt to exit."
                  ngspice rc.cir ;;
-        gtkwave) iverilog -o t.vvp t.v && vvp -n t.vvp >/dev/null && gtkwave t.vcd t.gtkw ;;
+        gtkwave) iverilog -o t.vvp t.v && vvp -n t.vvp >/dev/null && gtkwave -r t.gtkwaverc t.vcd t.gtkw ;;
         *)       echo "usage: $0 gui tk|magic|xschem|netgen|ngspice|gtkwave" >&2; exit 2 ;;
     esac
 }
