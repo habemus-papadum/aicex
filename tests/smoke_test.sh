@@ -4,10 +4,16 @@
 #-   ./smoke_test.sh              run the command-line checks (no windows)
 #-   ./smoke_test.sh gui <tool>   open one GUI with a small example:
 #-                                tk, magic, xschem, netgen, ngspice, gtkwave
+#-   ./smoke_test.sh gui magic --no-pdk
+#-                                start magic on its built-in tech instead of
+#-                                opening a sky130 cell
 set -uo pipefail
 
 EDA_PREFIX=${EDA_PREFIX:-/opt/eda}
+PDK_ROOT=${PDK_ROOT:-/opt/pdk/share/pdk}
 export PATH=${EDA_PREFIX}/bin:${PATH}
+#- Resolved before the cd below, so the magic check can find the example IP.
+REPO=$(cd -- "$(dirname -- "$0")/.." && pwd)
 #- Deliberately *not* setting LD_LIBRARY_PATH: "make eda_install" runs
 #- set_rpath.sh, which bakes an $ORIGIN-relative RPATH into everything that
 #- links ${EDA_PREFIX}/lib. Leaving it unset is what makes these checks catch a
@@ -87,24 +93,66 @@ EOF
 
 need_x11() {
     if [ -z "${DISPLAY:-}" ]; then
-        echo "DISPLAY is not set, so $1 can't reach XQuartz. See SMOKE_TESTS.md." >&2
+        echo "DISPLAY is not set, so $1 has no X server to draw on (XQuartz on" >&2
+        echo "macOS, or ssh -Y from one). See SMOKE_TESTS.md." >&2
         exit 1
     fi
 }
 
+#- The example layout the magic check opens, and the variant it was drawn in
+#- ("tech sky130B" on line 2 of the .mag). It comes from ip/rply_ex0_sky130nm,
+#- so it is only there once the submodules are checked out.
+MAGIC_CELL_DIR=${REPO}/ip/rply_ex0_sky130nm/design/RPLY_EX0_SKY130NM
+MAGIC_CELL=RPLY_EX0
+MAGIC_VARIANT=sky130B
+
+#- Start magic on a real PDK cell when one is available. Bare magic only shows
+#- that a window opens, on the built-in "minimum" tech - it says nothing about
+#- the PDK. Loading a sky130 cell also exercises tech-file parsing, the layer
+#- colours and the cairo/X11 draw path, which is what tends to break over
+#- "ssh -Y". Falls back to an empty layout, and finally to bare magic.
+magic_gui() {
+    local rcfile=${PDK_ROOT}/${MAGIC_VARIANT}/libs.tech/magic/${MAGIC_VARIANT}.magicrc
+
+    if [ "${1:-0}" = 1 ]; then
+        echo "--no-pdk: starting magic on its built-in tech (no PDK loaded)."
+        magic
+    elif [ ! -f "$rcfile" ]; then
+        echo "No ${MAGIC_VARIANT} rcfile under ${PDK_ROOT}; starting magic on its" >&2
+        echo "built-in tech. Run tests/install_open_pdk.sh for the PDK." >&2
+        magic
+    elif [ ! -f "${MAGIC_CELL_DIR}/${MAGIC_CELL}.mag" ]; then
+        echo "${MAGIC_CELL}.mag not found (run: git submodule update --init" >&2
+        echo "ip/rply_ex0_sky130nm); opening an empty ${MAGIC_VARIANT} layout." >&2
+        magic -rcfile "$rcfile"
+    else
+        echo "Opening ${MAGIC_CELL} on ${MAGIC_VARIANT}. Press 'v' to fit the view."
+        cd "$MAGIC_CELL_DIR" && magic -rcfile "$rcfile" "$MAGIC_CELL"
+    fi
+}
+
 gui() {
+    local no_pdk=0 tool=${1:-}
+    shift 2>/dev/null || true
+    for opt in "$@"; do
+        case "$opt" in
+            --no-pdk) no_pdk=1 ;;
+            *) echo "unknown option: $opt" >&2; exit 2 ;;
+        esac
+    done
     write_inputs
-    case "${1:-}" in
+    case "$tool" in
         tk)      need_x11 wish
                  echo 'button .b -text "Tk works - click to close" -command exit; pack .b' | wish8.6 ;;
-        magic)   need_x11 magic;   magic ;;
+        magic)   need_x11 magic;   magic_gui "$no_pdk" ;;
         xschem)  need_x11 xschem;  xschem "${EDA_PREFIX}/share/doc/xschem/examples/cmos_inv.sch" ;;
         netgen)  need_x11 netgen;  netgen ;;
         ngspice) need_x11 ngspice
                  echo "Type 'quit' at the ngspice prompt to exit."
                  ngspice rc.cir ;;
         gtkwave) iverilog -o t.vvp t.v && vvp -n t.vvp >/dev/null && gtkwave -r t.gtkwaverc t.vcd t.gtkw ;;
-        *)       echo "usage: $0 gui tk|magic|xschem|netgen|ngspice|gtkwave" >&2; exit 2 ;;
+        *)       echo "usage: $0 gui tk|magic|xschem|netgen|ngspice|gtkwave [--no-pdk]" >&2
+                 exit 2 ;;
     esac
 }
 
@@ -172,7 +220,7 @@ cli() {
 }
 
 case "${1:-}" in
-    gui) gui "${2:-}" ;;
+    gui) shift; gui "$@" ;;
     "")  cli ;;
-    *)   echo "usage: $0 [gui <tool>]" >&2; exit 2 ;;
+    *)   echo "usage: $0 [gui <tool> [--no-pdk]]" >&2; exit 2 ;;
 esac

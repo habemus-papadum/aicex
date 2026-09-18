@@ -2,13 +2,18 @@
 
 `tests/smoke_test.sh` checks that the tools installed by `tests/Makefile`
 into `$EDA_PREFIX` (default `/opt/eda`) actually work. See
-`MACOS_NOTES.md` for how they were built on macOS.
+`MACOS_NOTES.md` for how they were built on macOS, and `UBUNTU_NOTES.md`
+for Ubuntu 24.04.
 
 ```sh
 cd tests
-./smoke_test.sh               # command-line checks, no windows
-./smoke_test.sh gui gtkwave   # open one GUI tool with a small example
+./smoke_test.sh                     # command-line checks, no windows
+./smoke_test.sh gui gtkwave         # open one GUI tool with a small example
+./smoke_test.sh gui magic --no-pdk  # magic without loading the PDK
 ```
+
+The magic check reads `$PDK_ROOT` (default `/opt/pdk/share/pdk`); the rest
+need only `$EDA_PREFIX`.
 
 Each run writes its example files to a fresh `$TMPDIR/smoke.XXXXXX`
 directory. After a successful command-line run the directory is deleted.
@@ -39,11 +44,29 @@ tool isn't installed, for example Xyce and GTKWave, which aren't part of
 | Command                        | You should see                                                  |
 |--------------------------------|-----------------------------------------------------------------|
 | `./smoke_test.sh gui tk`       | a small window with a button; click it to close                  |
-| `./smoke_test.sh gui magic`    | a layout window and a Tk console. Without a PDK it uses the built-in `scmos` tech. For sky130, run `magic -rcfile $PDK_ROOT/sky130A/libs.tech/magic/sky130A.magicrc` |
+| `./smoke_test.sh gui magic`    | the `RPLY_EX0` layout on the sky130B tech, in a layout window with a Tk console. Press `v` to fit the view |
+| `./smoke_test.sh gui magic --no-pdk` | an empty layout window on magic's built-in `minimum` tech    |
 | `./smoke_test.sh gui xschem`   | xschem's bundled `cmos_inv.sch` example schematic               |
 | `./smoke_test.sh gui netgen`   | the netgen Tk console                                           |
 | `./smoke_test.sh gui ngspice`  | an X11 plot of an RC step (`v(in)`, `v(out)`). Type `quit` at the `ngspice` prompt to exit |
 | `./smoke_test.sh gui gtkwave`  | `t.clk` toggling every 5 ns across 0–100 ns, already in the Waves pane |
+
+**magic** opens a real PDK cell rather than an empty window, because bare
+magic proves only that a window appears — it loads the built-in `minimum`
+tech (`$EDA_PREFIX/lib/magic/sys/minimum.tech`) and says nothing about the
+PDK. Drawing `RPLY_EX0` also exercises tech-file parsing, the layer colours
+and the cairo/X11 path, which is what tends to break over `ssh -Y`.
+
+It needs two things that the plain tool checks do not:
+
+- the sky130B PDK, from `tests/install_open_pdk.sh`. sky130B, not sky130A:
+  `RPLY_EX0.mag` declares `tech sky130B` on its second line.
+- `ip/rply_ex0_sky130nm`, i.e. `git submodule update --init`.
+
+If either is missing the check says so and degrades — to an empty sky130B
+layout without the cell, or to bare magic without the PDK. `--no-pdk` forces
+that bare window, which is the way to tell a broken X11 setup apart from a
+broken PDK.
 
 **GTKWave** doesn't show any signals when it opens a dump file on its own.
 You pick them in the SST/Signals panes at the left: select `clk`, then
