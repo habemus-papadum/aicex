@@ -75,6 +75,12 @@ else
    BREW_DIR=/usr/local
 endif
 
+ifeq (${OS},mac)
+#- Apple's bison (2.3) is too old for iverilog and yosys. Homebrew's bison
+#- and flex are keg-only, so put them first on PATH for every recipe.
+export PATH := ${BREW_DIR}/opt/bison/bin:${BREW_DIR}/opt/flex/bin:${PATH}
+endif
+
 
 ifeq (${OS},mac)
 	X11_LIB = /usr/X11/lib
