@@ -42,8 +42,15 @@ GCC_VER=16
 #---------------------------------------------------------------------
 #- Variables
 #---------------------------------------------------------------------
-TK_PREFIX=/opt/eda
-EDA_PREFIX=/opt/eda
+#- Install prefix. Override from the environment for a per-user install,
+#- e.g. "export EDA_PREFIX=$HOME/opt/eda".
+EDA_PREFIX ?= /opt/eda
+TK_PREFIX ?= ${EDA_PREFIX}
+
+#- Only use sudo to install when the prefix (or its nearest existing
+#- parent) isn't writable by the current user. Force with "make SUDO=sudo".
+SUDO ?= $(shell d=${EDA_PREFIX}; while [ ! -e "$$d" ]; do d=$$(dirname "$$d"); done; \
+	test -w "$$d" || echo sudo)
 
 #-Check OS
 UNAME_S := $(shell uname -s)
@@ -208,7 +215,7 @@ tcl_compile: ${tclver}
 	make
 
 tcl_install:
-	cd ${tclver}/unix; sudo make install
+	cd ${tclver}/unix; ${SUDO} make install
 
 ${tkver}:
 	test -f ${tkver}-src.tar.gz || wget https://downloads.sourceforge.net/project/tcl/Tcl/${ttver}/${tkver}-src.tar.gz
@@ -223,14 +230,14 @@ tk_compile: ${tkver}
 	make
 
 tk_install:
-	cd ${tkver}/unix; sudo make install
+	cd ${tkver}/unix; ${SUDO} make install
 ifeq (${OS},mac)
 
 	-test -f ${TK_PREFIX}/bin/wish${ttver} &&  \
-	sudo install_name_tool -change ${TK_PREFIX}/lib:${X11_LIB}/libtk${ttver}.dylib \
+	${SUDO} install_name_tool -change ${TK_PREFIX}/lib:${X11_LIB}/libtk${ttver}.dylib \
 	${TK_PREFIX}/lib/libtk${ttver}.dylib ${TK_PREFIX}/bin/wish${ttver}
 	-test -f ${TK_PREFIX}/bin/wish8.6 && \
-	sudo install_name_tool -change ${TK_PREFIX}/lib:${X11_LIB}/libtk8.6.dylib \
+	${SUDO} install_name_tool -change ${TK_PREFIX}/lib:${X11_LIB}/libtk8.6.dylib \
 	${TK_PREFIX}/lib/libtk8.6.dylib ${TK_PREFIX}/bin/wish8.6
 endif
 
@@ -282,9 +289,9 @@ endif
 endif
 
 magic_install:
-	cd magic && sudo make install
+	cd magic && ${SUDO} make install
 ifeq (${OS},mac)
-	sudo install_name_tool -change ${TK_PREFIX}/lib:${X11_LIB}/libtk${ttver}.dylib ${TK_PREFIX}/lib/libtk${ttver}.dylib ${TK_PREFIX}/lib/magic/tcl/magicexec
+	${SUDO} install_name_tool -change ${TK_PREFIX}/lib:${X11_LIB}/libtk${ttver}.dylib ${TK_PREFIX}/lib/libtk${ttver}.dylib ${TK_PREFIX}/lib/magic/tcl/magicexec
 endif
 
 #--------------------------------------------------------------------
@@ -308,9 +315,9 @@ endif
 
 
 xschem_install:
-	cd xschem && sudo make install
+	cd xschem && ${SUDO} make install
 ifeq (${OS},mac)
-	sudo install_name_tool -change ${TK_PREFIX}/lib:${X11_LIB}/libtk8.6.dylib \
+	${SUDO} install_name_tool -change ${TK_PREFIX}/lib:${X11_LIB}/libtk8.6.dylib \
 	${TK_PREFIX}/lib/libtk8.6.dylib ${EDA_PREFIX}/bin/xschem
 
 
@@ -341,9 +348,9 @@ endif
 endif
 
 netgen_install:
-	cd netgen && sudo make install
+	cd netgen && ${SUDO} make install
 ifeq (${OS},mac)
-	sudo install_name_tool -change ${TK_PREFIX}/lib:${X11_LIB}/libtk${ttver}.dylib \
+	${SUDO} install_name_tool -change ${TK_PREFIX}/lib:${X11_LIB}/libtk${ttver}.dylib \
 	${TK_PREFIX}/lib/libtk${ttver}.dylib ${EDA_PREFIX}/lib/netgen/tcl/netgenexec
 endif
 
@@ -438,10 +445,10 @@ endif
 
 
 ngspice_install:
-	cd ngspice &&  sudo make install
+	cd ngspice &&  ${SUDO} make install
 
 ngspice2_install:
-	cd ngspice/release &&  sudo make install
+	cd ngspice/release &&  ${SUDO} make install
 
 
 #--------------------------------------------------------------------
@@ -463,9 +470,9 @@ else
 endif
 
 iverilog_install:
-	cd iverilog && sudo make install
+	cd iverilog && ${SUDO} make install
 ifeq (${OS},mac)
-	sudo install_name_tool -change libvvp.so /opt/eda/lib/libvvp.so /opt/eda/bin/vvp
+	${SUDO} install_name_tool -change libvvp.so ${EDA_PREFIX}/lib/libvvp.so ${EDA_PREFIX}/bin/vvp
 else
 
 endif
@@ -493,7 +500,7 @@ yosys_compile: yosys
 	&& make -j 8 PREFIX=${EDA_PREFIX}
 
 yosys_install:
-	cd yosys && sudo make PREFIX=${EDA_PREFIX} install
+	cd yosys && ${SUDO} make PREFIX=${EDA_PREFIX} install
 
 #--------------------------------------------------------------------
 # GTKWave
@@ -511,7 +518,7 @@ else
 endif
 
 gtkwave_install:
-	cd gtkwave && sudo make install
+	cd gtkwave && ${SUDO} make install
 
 #--------------------------------------------------------------------
 # OpenRoad
