@@ -1,56 +1,62 @@
+#!/usr/bin/env bash
+#- Build and install the sky130A PDK with open_pdks: primitives, the hd
+#- standard cells, and the xschem/klayout/precheck setup. Other sky130
+#- libraries and all of gf180mcu are skipped.
+#-
+#- Installs into ${PDK_PREFIX}/share/pdk, i.e. PDK_ROOT=${PDK_PREFIX}/share/pdk.
+#- PDK_PREFIX defaults to ${PDK_ROOT%/share/pdk} when PDK_ROOT is set, and
+#- to /opt/pdk otherwise. sudo is only used when the prefix (or its nearest
+#- existing parent) isn't writable; override with SUDO=... .
+#-
+#- open_pdks runs magic, so ${EDA_PREFIX:-/opt/eda}/bin must hold it. The
+#- source is cloned next to this script, in tests/open_pdks.
+set -euo pipefail
 
-export PDK_ROOT=/opt/pdk/share/pdk
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/eda/lib
-export PATH=/opt/eda/bin:$HOME/.local/bin:$PATH
+if [ -z "${PDK_PREFIX:-}" ]; then
+    case "${PDK_ROOT:-}" in
+        */share/pdk) PDK_PREFIX=${PDK_ROOT%/share/pdk} ;;
+        "")          PDK_PREFIX=/opt/pdk ;;
+        *)  echo "PDK_ROOT=$PDK_ROOT doesn't end in /share/pdk; set PDK_PREFIX" >&2
+            exit 1 ;;
+    esac
+fi
+export PDK_ROOT=${PDK_PREFIX}/share/pdk
 
+EDA_PREFIX=${EDA_PREFIX:-/opt/eda}
+export PATH=${EDA_PREFIX}/bin:${HOME}/.local/bin:${PATH}
+export LD_LIBRARY_PATH=${LD_LIBRARY_PATH:+${LD_LIBRARY_PATH}:}${EDA_PREFIX}/lib
 
+if [ -z "${SUDO+set}" ]; then
+    d=$PDK_PREFIX
+    while [ ! -e "$d" ]; do d=$(dirname "$d"); done
+    if [ -w "$d" ]; then SUDO=""; else SUDO=sudo; fi
+fi
 
-#- Pre install skywater pdk
-test -f /opt/pdk || sudo mkdir /opt/pdk
-sudo chmod 777 /opt/pdk
-#cd /opt/pdk
-#git clone https://github.com/google/skywater-pdk
-#cd skywater-pdk
-#git pull
-#git submodule init libraries/sky130_fd_io/latest
-#git submodule init libraries/sky130_fd_pr/latest
-#Skip most of the libraries, usully not needed for analog design
-#git submodule init libraries/sky130_fd_sc_hd/latest
-#git submodule init libraries/sky130_fd_sc_hvl/latest
-#git submodule update
-#make timing
-cd /opt/pdk
+command -v magic >/dev/null || { echo "magic not found in ${EDA_PREFIX}/bin" >&2; exit 1; }
 
-#- Use open pdk to install pdk
+echo "Installing sky130A into ${PDK_ROOT}${SUDO:+ (using $SUDO)}"
+$SUDO mkdir -p "$PDK_PREFIX"
 
-test -f open_pdks || git clone https://github.com/RTimothyEdwards/open_pdks.git
+cd "$(dirname "$0")"
+if [ -d open_pdks ]; then
+    git -C open_pdks pull
+else
+    git clone https://github.com/RTimothyEdwards/open_pdks.git
+fi
 
-cd open_pdks && \
-          ./configure --prefix=/opt/pdk --enable-sky130-pdk --with-sky130-variants=A \
-            --enable-primitive-sky130 --enable-sc-hd-sky130 \
-            --disable-io-sky130 --disable-sc-hs-sky130 --disable-sc-ms-sky130 --disable-sc-ls-sky130 \
-            --disable-sc-lp-sky130 --disable-sc-hdll-sky130 --disable-sc-hvl-sky130 --disable-alpha-sky130 \
-            --enable-xschem-sky130 \
-            --disable-gf180mcu-pdk --disable-primitive-gf180mcu \
-            --disable-verification-gf180mcu --disable-klayout-gf180mcu --disable-io-gf180mcu \
-            --disable-sc-7t5v0-gf180mcu --disable-sc-9t5v0-gf180mcu --disable-sram-gf180mcu \
-            --disable-alpha-gf180mcu --disable-osu-sc-gf180mcu --disable-avalon-sc-gf180mcu \
-            --disable-ocd-io-gf180mcu --disable-ocd-sram-gf180mcu \
-            && make && sudo make install
-#git clone https://github.com/RTimothyEdwards/open_pdks
-#cd open_pdks
-#git pull
-#./configure --enable-sky130-pdk=/opt/pdk/skywater-pdk --prefix=/opt/pdk/ \
-#    --enable-irsim=no \
-#    --enable-openlane=no \
-#    --enable-qflow=no \
-#    --enable-alpha-sky130=no \
-#    --enable-io-gf180mcu=no \
-#    --enable-sc-7t5v0-gf180mcu=no \
-#    --enable-sc-9t5v0-gf180mcu=no \
-#    --enable-sram-gf180mcu=no
-#make
-#sudo make install
+cd open_pdks
+./configure --prefix="$PDK_PREFIX" --enable-sky130-pdk --with-sky130-variants=A \
+    --enable-primitive-sky130 --enable-sc-hd-sky130 \
+    --disable-io-sky130 --disable-sc-hs-sky130 --disable-sc-ms-sky130 --disable-sc-ls-sky130 \
+    --disable-sc-lp-sky130 --disable-sc-hdll-sky130 --disable-sc-hvl-sky130 --disable-alpha-sky130 \
+    --enable-xschem-sky130 \
+    --disable-gf180mcu-pdk --disable-primitive-gf180mcu \
+    --disable-verification-gf180mcu --disable-io-gf180mcu \
+    --disable-sc-7t5v0-gf180mcu --disable-sc-9t5v0-gf180mcu --disable-sram-gf180mcu \
+    --disable-alpha-gf180mcu --disable-osu-sc-gf180mcu --disable-avalon-sc-gf180mcu \
+    --disable-re-efuse-gf180mcu --disable-ocd-io-gf180mcu --disable-ocd-sram-gf180mcu
+make
+$SUDO make install
 
 #- Patch missing metal resistor
-#sudo cp /opt/pdk/share/pdk/sky130A/libs.tech/xschem/sky130_fd_pr/res_generic_li.sym  /opt/pdk/share/pdk/sky130A/libs.tech/xschem/sky130_fd_pr/res_generic_l1.sym
+#$SUDO cp ${PDK_ROOT}/sky130A/libs.tech/xschem/sky130_fd_pr/res_generic_li.sym ${PDK_ROOT}/sky130A/libs.tech/xschem/sky130_fd_pr/res_generic_l1.sym

@@ -170,3 +170,4 @@ dmypy.json
 /tests/trilinos-build/
 /tests/xyce/
 /tests/xyce-build/
+/tests/open_pdks/
