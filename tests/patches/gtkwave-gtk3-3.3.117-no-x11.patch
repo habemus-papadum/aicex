@@ -1,0 +1,44 @@
+gtkwave-gtk3 3.3.117: build against a GTK3 without the X11 backend.
+
+GtkPlug/GtkSocket only exist with GDK's X11 backend. Homebrew's GTK3 is
+Quartz-only, so main.c fails with "call to undeclared function
+'gtk_plug_new'" and twinwave.c uses gtk_socket_new(). Only enable --xid
+with X11 (as upstream master guards it), and build twinwave as a stub.
+
+--- a/src/main.c
++++ b/src/main.c
+@@ -40,7 +40,8 @@
+ #include <sys/types.h>
+ #endif
+ 
+-#if !defined __MINGW32__
++/* GtkPlug (--xid) needs GDK's X11 backend; GTK3 may be Quartz/Wayland-only. */
++#if !defined __MINGW32__ && (!GTK_CHECK_VERSION(3,0,0) || defined GDK_WINDOWING_X11)
+ #define WAVE_USE_XID
+ #else
+ #undef WAVE_USE_XID
+--- a/src/twinwave.c
++++ b/src/twinwave.c
+@@ -26,6 +26,17 @@
+ #endif
+ 
+ #include "wave_locale.h"
++
++#if !defined(__MINGW32__) && GTK_CHECK_VERSION(3,0,0) && !defined(GDK_WINDOWING_X11)
++/* twinwave embeds two viewers with GtkSocket/GtkPlug, which need GDK's X11
++ * backend (Homebrew's GTK3 is Quartz-only). Build a stub instead. */
++int main(int argc, char **argv)
++{
++(void)argc;
++fprintf(stderr, "%s: not supported without the GTK X11 backend\n", argv[0]);
++return(255);
++}
++#else
+ 
+ #include <sys/time.h>
+ #include <sys/types.h>
+@@ -503,3 +514,4 @@
+ return(0);
+ }
+ 
++#endif

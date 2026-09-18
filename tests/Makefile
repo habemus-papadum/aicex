@@ -531,14 +531,28 @@ yosys_install:
 #--------------------------------------------------------------------
 # GTKWave
 #--------------------------------------------------------------------
+#- Homebrew's gtkwave cask is disabled, so build it. Homebrew's
+#- gtk-mac-integration is GTK3-only: a GTK2 gtkwave would load GTK2 and GTK3
+#- into one process ("Class GdkQuartzView is implemented in both ..."), so
+#- use the GTK3 edition on macOS.
+ifeq (${OS},mac)
+GTKWAVE_PKG=gtkwave-gtk3-${GTKWAVE_VER}
+else
+GTKWAVE_PKG=gtkwave-${GTKWAVE_VER}
+endif
+
 gtkwave:
-	wget http://gtkwave.sourceforge.net/gtkwave-${GTKWAVE_VER}.tar.gz
-	tar zxvf gtkwave-${GTKWAVE_VER}.tar.gz
-	ln -s gtkwave-${GTKWAVE_VER} gtkwave
+	test -f ${GTKWAVE_PKG}.tar.gz || wget https://downloads.sourceforge.net/project/gtkwave/${GTKWAVE_PKG}/${GTKWAVE_PKG}.tar.gz
+	tar zxvf ${GTKWAVE_PKG}.tar.gz
+	ln -s ${GTKWAVE_PKG} gtkwave
 
 gtkwave_compile: gtkwave
+	cd gtkwave && for p in ../patches/${GTKWAVE_PKG}-*.patch; do [ -e "$$p" ] || continue; \
+	patch -p1 -R -s -f --dry-run < "$$p" >/dev/null 2>&1 || patch -p1 < "$$p"; done
 ifeq (${OS},mac)
-	cd gtkwave && export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig/ &&./configure --prefix ${EDA_PREFIX} --disable-tcl --disable-xy && make
+	#- Homebrew headers/libs (e.g. xz's lzma.h) aren't on clang's default paths.
+	cd gtkwave && ./configure --prefix ${EDA_PREFIX} --disable-tcl --disable-xy --enable-gtk3 \
+	CPPFLAGS="-I${BREW_DIR}/include" LDFLAGS="-L${BREW_DIR}/lib" && make
 else
 	cd gtkwave && ./configure --prefix ${EDA_PREFIX} --disable-tcl --disable-xy && make
 endif
